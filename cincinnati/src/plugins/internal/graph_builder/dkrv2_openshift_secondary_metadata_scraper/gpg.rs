@@ -74,7 +74,7 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
     let status = res.status();
     match status.is_success() {
         true => Ok(res.bytes().await?),
-        false => Err(format_err!("Error fetching {} - {}", url_s, status)),
+        false => Err(format_err!("Error fetching {} - {} - {}", url_s, status, res.text().await?)),
     }
 }
 
