@@ -1,6 +1,7 @@
 /// Tiny crate to verify message signature and format
 use self::cincinnati::plugins::prelude::*;
 use crate as cincinnati;
+use actix_web::http;
 use bytes::Buf;
 use bytes::Bytes;
 use futures::TryFutureExt;
@@ -8,7 +9,10 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde_json;
 use std::fs::{read_dir, File};
+use std::net::IpAddr;
 use std::ops::Range;
+use std::os::linux::raw::stat;
+use std::os::unix::net::SocketAddr;
 use std::path::Path;
 use url::Url;
 
@@ -70,11 +74,21 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
         .map_err(|e| format_err!(e.to_string()))
         .await?;
 
+    // let mut headers_string = String::new();
+    // for (name, value) in res.headers().iter() {
+    //     headers_string.push_str(&format!("{}: {}\n", name, value.to_str().unwrap_or("Invalid UTF-8")));
+    // }
+    let remote = res.remote_addr().unwrap();
     let url_s = url.to_string();
     let status = res.status();
+    let bytes = res.bytes().await?;
+    // if status.is_success() {
+    //     println!("Success fetching {} - remote_addr:{}:{} - {}", url_s, remote.ip().to_string(), remote.port(), status);
+    // }
+    println!("received response from {} - remote_addr:{}:{} - {}", url_s, remote.ip().to_string(), remote.port(), status);
     match status.is_success() {
-        true => Ok(res.bytes().await?),
-        false => Err(format_err!("Error fetching {} - {} - {}", url_s, status, res.text().await?)),
+        true => Ok(bytes),
+        false => Err(format_err!("Error fetching {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes))),
     }
 }
 
