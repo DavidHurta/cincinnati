@@ -5,13 +5,14 @@ use actix_web::http;
 use bytes::Buf;
 use bytes::Bytes;
 use futures::TryFutureExt;
-use reqwest::Client;
 use serde::Deserialize;
 use serde_json;
 use std::fs::{read_dir, File};
 use std::net::IpAddr;
 use std::ops::Range;
 use std::os::linux::raw::stat;
+use reqwest::redirect::Policy;
+use reqwest::{Client, ClientBuilder};
 use std::os::unix::net::SocketAddr;
 use std::path::Path;
 use url::Url;
@@ -65,10 +66,16 @@ pub fn load_public_keys(public_keys_dir: &Path) -> Fallible<Keyring> {
 
 /// Fetch signature contents by building a URL for signature store
 pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) -> Fallible<Bytes> {
+    let http_client: Client = ClientBuilder::new()
+    .gzip(true)
+    .redirect(Policy::none())
+    .build()
+    .context("Building reqwest client")?;
+
     let url = base_url
         .join(format!("{}/", sha.replace(":", "=")).as_str())?
         .join(format!("signature-{}", i).as_str())?;
-    let res = http_client
+    let mut res = http_client
         .get(url.clone())
         .send()
         .map_err(|e| format_err!(e.to_string()))
@@ -78,14 +85,48 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
     // for (name, value) in res.headers().iter() {
     //     headers_string.push_str(&format!("{}: {}\n", name, value.to_str().unwrap_or("Invalid UTF-8")));
     // }
+
+    // if status.is_success() {
+    //     println!("Success fetching {} - remote_addr:{}:{} - {}", url_s, remote.ip().to_string(), remote.port(), status);
+    // }
+
+    if res.status().is_redirection() {
+        if let Some(location) = res.headers().get("Location") {
+            let location = location.to_str().unwrap_or_default().to_string();
+
+            println!("redirected to: {}", location);
+
+            println!("redirected to: {}", location);
+            let remote = res.remote_addr().unwrap();
+            let url_s = url.to_string();
+            let status = res.status();
+            let bytes = res.bytes().await?;
+            println!("redirecting {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes));
+        
+
+            res = http_client.get(location).send().await?;
+        }
+    }
+    if res.status().is_redirection() {
+        if let Some(location) = res.headers().get("Location") {
+            let location = location.to_str().unwrap_or_default().to_string();
+
+            println!("redirected to: {}", location);
+            let remote = res.remote_addr().unwrap();
+            let url_s = url.to_string();
+            let status = res.status();
+            let bytes = res.bytes().await?;
+            println!("redirecting {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes));
+            
+            res = http_client.get(location).send().await?;
+        }
+    }
+
     let remote = res.remote_addr().unwrap();
     let url_s = url.to_string();
     let status = res.status();
     let bytes = res.bytes().await?;
-    // if status.is_success() {
-    //     println!("Success fetching {} - remote_addr:{}:{} - {}", url_s, remote.ip().to_string(), remote.port(), status);
-    // }
-    println!("received response from {} - remote_addr:{}:{} - {}", url_s, remote.ip().to_string(), remote.port(), status);
+    println!("received response from {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes));
     match status.is_success() {
         true => Ok(bytes),
         false => Err(format_err!("Error fetching {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes))),
