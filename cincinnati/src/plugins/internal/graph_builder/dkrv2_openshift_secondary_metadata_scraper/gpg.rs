@@ -81,11 +81,6 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
         .map_err(|e| format_err!(e.to_string()))
         .await?;
 
-    // let mut headers_string = String::new();
-    // for (name, value) in res.headers().iter() {
-    //     headers_string.push_str(&format!("{}: {}\n", name, value.to_str().unwrap_or("Invalid UTF-8")));
-    // }
-
     // if status.is_success() {
     //     println!("Success fetching {} - remote_addr:{}:{} - {}", url_s, remote.ip().to_string(), remote.port(), status);
     // }
@@ -94,12 +89,17 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
         if let Some(location) = res.headers().get("Location") {
             let location = location.to_str().unwrap_or_default().to_string();
 
+            let mut headers_string = String::new();
+            for (name, value) in res.headers().iter() {
+                headers_string.push_str(&format!("{}: {}\n", name, value.to_str().unwrap_or("Invalid UTF-8")));
+            }        
+
             let remote = res.remote_addr().unwrap();
             let url_s = url.to_string();
             let status = res.status();
             let bytes = res.bytes().await?;
             println!("307: {} redirected to: {}", url_s, location);
-            println!("redirecting {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes));
+            println!("redirecting {} - remote_addr:{}:{} - {} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, headers_string, String::from_utf8_lossy(&bytes));
         
 
             res = http_client.get(location).send().await?;
@@ -109,25 +109,35 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
         if let Some(location) = res.headers().get("Location") {
             let location = location.to_str().unwrap_or_default().to_string();
 
+            let mut headers_string = String::new();
+            for (name, value) in res.headers().iter() {
+                headers_string.push_str(&format!("{}: {}\n", name, value.to_str().unwrap_or("Invalid UTF-8")));
+            }        
+
             let remote = res.remote_addr().unwrap();
             let url_s = url.to_string();
             let status = res.status();
             let bytes = res.bytes().await?;
             println!("307: {} redirected to: {}", url_s, location);
-            println!("redirecting {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes));
-            
+            println!("redirecting {} - remote_addr:{}:{} - {} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, headers_string, String::from_utf8_lossy(&bytes));
+        
+
             res = http_client.get(location).send().await?;
         }
     }
 
+    let mut headers_string = String::new();
+    for (name, value) in res.headers().iter() {
+        headers_string.push_str(&format!("{}: {}\n", name, value.to_str().unwrap_or("Invalid UTF-8")));
+    }   
     let remote = res.remote_addr().unwrap();
     let url_s = url.to_string();
     let status = res.status();
     let bytes = res.bytes().await?;
-    println!("received response from {} - remote_addr:{}:{} - {}", url_s, remote.ip().to_string(), remote.port(), status);
+    println!("received response from {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, headers_string);
     match status.is_success() {
         true => Ok(bytes),
-        false => Err(format_err!("Error fetching {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes))),
+        false => Err(format_err!("Error fetching {} - remote_addr:{}:{} - {} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, headers_string, String::from_utf8_lossy(&bytes))),
     }
 }
 
