@@ -94,13 +94,11 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
         if let Some(location) = res.headers().get("Location") {
             let location = location.to_str().unwrap_or_default().to_string();
 
-            println!("redirected to: {}", location);
-
-            println!("redirected to: {}", location);
             let remote = res.remote_addr().unwrap();
             let url_s = url.to_string();
             let status = res.status();
             let bytes = res.bytes().await?;
+            println!("307: {} redirected to: {}", url_s, location);
             println!("redirecting {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes));
         
 
@@ -111,11 +109,11 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
         if let Some(location) = res.headers().get("Location") {
             let location = location.to_str().unwrap_or_default().to_string();
 
-            println!("redirected to: {}", location);
             let remote = res.remote_addr().unwrap();
             let url_s = url.to_string();
             let status = res.status();
             let bytes = res.bytes().await?;
+            println!("307: {} redirected to: {}", url_s, location);
             println!("redirecting {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes));
             
             res = http_client.get(location).send().await?;
@@ -126,7 +124,7 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
     let url_s = url.to_string();
     let status = res.status();
     let bytes = res.bytes().await?;
-    println!("received response from {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes));
+    println!("received response from {} - remote_addr:{}:{} - {}", url_s, remote.ip().to_string(), remote.port(), status);
     match status.is_success() {
         true => Ok(bytes),
         false => Err(format_err!("Error fetching {} - remote_addr:{}:{} - {} - {}", url_s, remote.ip().to_string(), remote.port(), status, String::from_utf8_lossy(&bytes))),
