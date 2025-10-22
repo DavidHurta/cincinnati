@@ -64,11 +64,7 @@ pub async fn fetch_url(http_client: &Client, base_url: &Url, sha: &str, i: u64) 
     let url = base_url
         .join(format!("{}/", sha.replace(":", "=")).as_str())?
         .join(format!("signature-{}", i).as_str())?;
-    let res = http_client
-        .get(url.clone())
-        .send()
-        .map_err(|e| format_err!(e.to_string()))
-        .await?;
+    let res = http_client.get(url.clone()).send().await?;
 
     let url_s = url.to_string();
     let status = res.status();
